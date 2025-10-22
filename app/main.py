@@ -64,75 +64,46 @@ async def analyze_string(string: StringIn, session: SessionDep):
     
     return JSONResponse(
         content=response_data,
-        status_code=status.HTTP_201_CREATED
+        status_code=201
     )
 
 
+
 @app.get("/strings/filter-by-natural-language")
-def filter_nl(
-    session: SessionDep,
-    query: str = Query(..., description="Natural language query"),
-):
+def filter_by_natural_language(session: SessionDep, query: str = Query(...)):
     try:
         parsed = parse_nl_query(query)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to parse natural language query"
-        )
+    except ValueError as e:
+        msg = str(e)
+        if "conflict" in msg.lower() or "min_length" in msg:
+            raise HTTPException(status_code=422, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
 
-    if (
-        "min_length" in parsed
-        and "max_length" in parsed
-        and parsed["min_length"] > parsed["max_length"]
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Query parsed but resulted in conflicting filters"
-        )
-
+    
     q = select(DataEntry)
-    
-    if parsed.get("is_palindrome") is True:
+    if parsed.get('is_palindrome') is True:
         q = q.where(DataEntry.is_palindrome == True)
-    
-    if parsed.get("min_length") is not None:
-        q = q.where(DataEntry.length >= parsed["min_length"])
-    if parsed.get("max_length") is not None:
-        q = q.where(DataEntry.length <= parsed["max_length"])
-    
-    if parsed.get("word_count") is not None:
-        q = q.where(DataEntry.word_count == parsed["word_count"])
+    if parsed.get('min_length') is not None:
+        q = q.where(DataEntry.length >= parsed['min_length'])
+    if parsed.get('max_length') is not None:
+        q = q.where(DataEntry.length <= parsed['max_length'])
+    if parsed.get('word_count') is not None:
+        q = q.where(DataEntry.word_count == parsed['word_count'])
+
 
     rows = session.exec(q).all()
-
-    
-    if parsed.get("contains_character"):
-        ch = parsed["contains_character"].lower()
-        
-        filtered = []
-        for r in rows:
-            freq_map = r.character_frequency_map or {}
-            keys_lower = {str(k).lower() for k in freq_map.keys()}
-            if ch in keys_lower:
-                filtered.append(r)
-        rows = filtered
-
-    if not rows:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No records matched the interpreted natural language filters"
-        )
+    if parsed.get('contains_character'):
+        ch = parsed['contains_character']
+        rows = [r for r in rows if ch in r.character_frequency_map]
 
     matching_string = [s.value for s in rows]
-
     return {
         "data": matching_string,
         "count": len(matching_string),
         "interpreted_query": {
             "original": query,
-            "parsed_filters": parsed,
-        },
+            "parsed_filters": parsed
+        }
     }
 
 
@@ -254,3 +225,4 @@ def delete_string(session: SessionDep, string_value: str):
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+
