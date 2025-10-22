@@ -55,7 +55,10 @@ def analyze_string(string: StringIn, session: SessionDep):
     )
     
     
-    return response_data
+    return JSONResponse(
+        content=response_data,
+        status_code=status.HTTP_201_CREATED
+    )
 
 
 @app.get("/strings/filter-by-natural-language")
