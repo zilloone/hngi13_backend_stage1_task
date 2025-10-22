@@ -130,7 +130,10 @@ def read_string(string_value: str, session: SessionDep):
         created_at=data.created_at 
     )  
 
-    return response_data
+    return JSONResponse(
+        status_code=200,
+        content=response_data
+    )
 
 
 
@@ -185,7 +188,9 @@ def get_all_strings(
             )
             data.append(response_data)
 
-        return {
+        return JSONResponse(
+            status_code=200,
+            content={
             "data": data,
             "count": count,
             "filters_applied": {
@@ -196,6 +201,7 @@ def get_all_strings(
                 "contains_character": contains_character,
             },
         }
+        )
 
     except Exception:
         # Keep error message generic but return 400 as before
