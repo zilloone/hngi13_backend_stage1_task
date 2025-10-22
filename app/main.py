@@ -20,47 +20,49 @@ app = FastAPI()
 
 @app.post("/strings", status_code=status.HTTP_201_CREATED, response_model=StringResponse)
 def analyze_string(string: StringIn, session: SessionDep):
+   
+    value = string.value
 
-    
-    body = string.model_dump()
-    if 'value' not in body:
-        raise HTTPException(status_code=400, detail='Invalid request body or missing "value" field')
-    value = body['value']
-
-    if not isinstance(value, str):
-        raise HTTPException(status_code=422, detail=" Invalid data type for 'value' (must be string)")
-
+    # Compute properties
     props = string_analyzer(value)
     hashed_value = props.sha256_hash
-    existing = session.exec(select(DataEntry).where(DataEntry.sha256_hash == hashed_value)).first()
+
+    # Duplicate check
+    existing = session.exec(
+        select(DataEntry).where(DataEntry.sha256_hash == hashed_value)
+    ).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="String already exists in the system")
-    
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="String already exists in the system"
+        )
+
+    # Create DB record
     data_entry = DataEntry(
-        id = props.sha256_hash, 
-        value = value,
-        length = props.length,
-        is_palindrome = props.is_palindrome,
-        unique_characters = props.unique_characters,
-        sha256_hash = props.sha256_hash,
-        word_count = props.word_count,
-        character_frequency_map = props.character_frequency_map,
-        created_at = now_isoutc()
+        id=hashed_value,
+        value=value,
+        length=props.length,
+        is_palindrome=props.is_palindrome,
+        unique_characters=props.unique_characters,
+        sha256_hash=hashed_value,
+        word_count=props.word_count,
+        character_frequency_map=props.character_frequency_map,
+        created_at=now_isoutc(),
     )
 
     session.add(data_entry)
     session.commit()
     session.refresh(data_entry)
 
-    response_data = StringResponse(
+    # Build the response exactly matching response_model
+    # If Properties is a Pydantic model compatible with response_model, you can pass props directly.
+    return StringResponse(
         id=data_entry.id,
         value=data_entry.value,
         properties=props,
         created_at=data_entry.created_at
     )
-    
-    
-    return response_data
+
 
 
 
