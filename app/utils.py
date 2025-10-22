@@ -1,6 +1,7 @@
 import hashlib
 import re
 from datetime import datetime, timezone
+from typing import Any
 
 from app.models import StringResponse, Properties
 
@@ -47,29 +48,48 @@ def string_analyzer(text: str):
 def now_isoutc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-def parse_nl_query(text: str):
-    text = text.lower()
-    filters = {}
 
-    if "palindrom" in text:
-        filters["is_palindrome"] = True
+def parse_nl_query(q: str) -> dict[str, Any]:
+    s = q.lower()
+    parsed: dict[str, Any] = {}
 
-    if "single word" in text or "one word" in text:
-        filters["word_count"] = 1
+    
+    if re.search(r'\bsingle word\b|\bone word\b', s):
+        parsed['word_count'] = 1
 
-    if match := re.search(r"longer than (\d+)", text):
-        filters["min_length"] = int(match.group(1)) + 1
+    if 'palindrom' in s:
+        parsed['is_palindrome'] = True
 
-    if match := re.search(r"shorter than (\d+)", text):
-        filters["max_length"] = int(match.group(1)) - 1
+    m = re.search(r'longer than (\d+)', s)
+    if m:
+        parsed['min_length'] = int(m.group(1)) + 1
 
-    if match := re.search(r"letter\s+([a-zA-Z])", text):
-        filters["contains_character"] = match.group(1)
+    
+    m = re.search(r'shorter than (\d+)', s)
+    if m:
+        parsed['max_length'] = int(m.group(1)) - 1
 
-    if not filters:
-        raise ValueError("Could not understand the query.")
+    
+    if re.search(r'first vowel', s):
+        parsed['contains_character'] = 'a'
 
-    return filters
+    m = re.search(r'letter\s+([a-zA-Z])', s)
+    if m:
+        parsed['contains_character'] = m.group(1)
+
+    if 'containing the letter' in s and 'contains_character' not in parsed:
+        m = re.search(r'containing the letter\s+([a-zA-Z])', s)
+        if m:
+            parsed['contains_character'] = m.group(1)
+
+    if not parsed:
+        raise ValueError("Unable to parse natural language query")
+
+    # conflict check: min_length > max_length
+    if 'min_length' in parsed and 'max_length' in parsed and parsed['min_length'] > parsed['max_length']:
+        raise ValueError("Parsed filters conflict: min_length > max_length")
+
+    return parsed
 
 
 

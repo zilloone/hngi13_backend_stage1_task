@@ -139,8 +139,8 @@ def filter_nl(
 
 @app.get("/strings/{string_value}", status_code=status.HTTP_200_OK, response_model=StringResponse)
 def read_string(string_value: str, session: SessionDep): 
-    sha256_hash = generate_sha256(string_value)
-    data = session.exec(select(DataEntry).where(DataEntry.sha256_hash == sha256_hash)).first() 
+    #sha256_hash = generate_sha256(string_value)
+    data = session.exec(select(DataEntry).where(DataEntry.value == string_value)).first() 
     if data is None: 
         raise HTTPException(status_code=404, detail="String does not exist in the system") 
     props = Properties(
@@ -170,7 +170,7 @@ def get_all_strings(
     min_length: int | None = Query(None, ge=0),
     max_length: int | None = Query(None, ge=0),
     word_count: int | None = Query(None, ge=0),
-    contains_character: str | None = Query(None),
+    contains_character: str | None = Query(None, min_length=1, max_length=1),
 ):
     try:
         if min_length is not None and max_length is not None and min_length > max_length:
@@ -237,9 +237,9 @@ def get_all_strings(
 
 @app.delete("/strings/{string_value}", status_code=204)
 def delete_string(session: SessionDep, string_value: str):
-    hashed_value = generate_sha256(string_value)
+    #hashed_value = generate_sha256(string_value)
 
-    db_obj = session.exec(select(DataEntry).where(DataEntry.sha256_hash == hashed_value)).first()
+    db_obj = session.exec(select(DataEntry).where(DataEntry.value == string_value)).first()
     if not db_obj:
         raise HTTPException(status_code=404, detail="String does not exist in the system")
     session.delete(db_obj)
