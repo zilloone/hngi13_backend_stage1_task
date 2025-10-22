@@ -20,7 +20,7 @@ def string_analyzer(text: str):
         is_palindrome = False
     unique_chars = set(lower_text)
 
-    words_count = len(text.split())
+    word_count = len(text.split())
 
     sha256_hash = generate_sha256(text=text)
 
@@ -35,7 +35,7 @@ def string_analyzer(text: str):
         length = len(lower_text),
         is_palindrome = is_palindrome,
         unique_characters = len(unique_chars),
-        words_count = words_count,
+        word_count = word_count,
         sha256_hash =  sha256_hash,
         character_frequency_map = character_frequncy_map
     )

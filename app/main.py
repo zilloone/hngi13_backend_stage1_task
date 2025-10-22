@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, status, Response
 from fastapi.responses import JSONResponse
 from sqlmodel import SQLModel, select, func
 from app.utils import string_analyzer
@@ -16,7 +16,7 @@ class Data(SQLModel):
 app = FastAPI()
 
 
-@app.post("/strings", status_code=201, response_model=StringResponse)
+@app.post("/strings", status_code=status.HTTP_201_CREATED, response_model=StringResponse)
 def analyze_string(string: Data, session: SessionDep):
     if not isinstance(string.value, str):
         raise HTTPException(status_code=422, detail=" Invalid data type for 'value' (must be string)")
@@ -36,7 +36,7 @@ def analyze_string(string: Data, session: SessionDep):
         is_palindrome = props.is_palindrome,
         unique_characters = props.unique_characters,
         sha256_hash = props.sha256_hash,
-        words_count = props.words_count,
+        word_count = props.word_count,
         character_frequency_map = props.character_frequency_map,
         created_at = now_isoutc()
     )
@@ -56,9 +56,6 @@ def analyze_string(string: Data, session: SessionDep):
     return response_data
 
 
-from fastapi import HTTPException, Query
-from sqlmodel import select
-
 @app.get("/strings/filter-by-natural-language")
 def filter_nl(
     session: SessionDep,
@@ -69,10 +66,7 @@ def filter_nl(
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail={
-                "error": "400 Bad Request",
-                "message": "Unable to parse natural language query"
-            },
+            detail="Unable to parse natural language query"
         )
 
     
@@ -83,10 +77,7 @@ def filter_nl(
     ):
         raise HTTPException(
             status_code=422,
-            detail={
-                "error": "422 Unprocessable Entity",
-                "message": "Query parsed but resulted in conflicting filters"
-            },
+            detail="Query parsed but resulted in conflicting filters"
         )
 
     q = select(DataEntry)
@@ -112,32 +103,15 @@ def filter_nl(
     if not rows:
         raise HTTPException(
             status_code=404,
-            detail={
-                "error": "404 Not Found",
-                "message": "No records matched the interpreted natural language filters"
-            },
+            detail="No records matched the interpreted natural language filters"
         )
 
-    data = []
-    for r in rows:
-        props = {
-            "length": r.length,
-            "is_palindrome": r.is_palindrome,
-            "unique_characters": r.unique_characters,
-            "word_count": r.words_count,
-            "sha256_hash": r.sha256_hash,
-            "character_frequency_map": r.character_frequency_map,
-        }
-        data.append({
-            "id": r.sha256_hash,
-            "value": r.value,
-            "properties": props,
-            "created_at": r.created_at,
-        })
+
+    matching_string = [string.value for string in rows]
 
     return {
-        "data": data,
-        "count": len(data),
+        "data": matching_string,
+        "count": len(matching_string),
         "interpreted_query": {
             "original": query,
             "parsed_filters": parsed,
@@ -145,7 +119,7 @@ def filter_nl(
     }
 
 
-@app.get("/strings/{string_value}", response_model=StringResponse)
+@app.get("/strings/{string_value}", status_code=status.HTTP_200_OK, response_model=StringResponse)
 def read_string(string_value: str, session: SessionDep):
     sha256_hash = generate_sha256(string_value)
     data = session.exec(select(DataEntry).where(DataEntry.sha256_hash == sha256_hash)).first()
@@ -157,7 +131,7 @@ def read_string(string_value: str, session: SessionDep):
         is_palindrome = data.is_palindrome,
         unique_characters = data.unique_characters,
         sha256_hash = data.sha256_hash,
-        words_count = data.words_count,
+        word_count = data.word_count,
         character_frequency_map = data.character_frequency_map,
     )
 
@@ -170,9 +144,6 @@ def read_string(string_value: str, session: SessionDep):
 
     return response_data
 
-from fastapi import HTTPException, Query
-from sqlmodel import select
-from sqlalchemy import func
 
 @app.get("/strings")
 def get_all_strings(
@@ -187,7 +158,7 @@ def get_all_strings(
         if min_length is not None and max_length is not None and min_length > max_length:
             raise HTTPException(
                 status_code=400,
-                detail="Error Response: 400 Bad Request: Invalid query parameter values or types",
+                detail="Invalid query parameter values or types",
             )
 
         statement = select(DataEntry)
@@ -201,9 +172,7 @@ def get_all_strings(
         if word_count is not None:
             statement = statement.where(DataEntry.words_count == word_count)
         if contains_character is not None:
-            statement = statement.where(
-                func.lower(DataEntry.value).contains(contains_character.lower())
-            )
+            statement = statement.where(DataEntry.value.ilike(f"%{contains_character}%"))
 
         result = session.exec(statement).all()
         count = len(result)
@@ -242,7 +211,7 @@ def get_all_strings(
         # Catch all unexpected issues with query parsing or DB filtering
         raise HTTPException(
             status_code=400,
-            detail="Error Response: 400 Bad Request: Invalid query parameter values or types",
+            detail="Invalid query parameter values or types",
         )
 
 
@@ -256,7 +225,7 @@ def delete_string(session: SessionDep, string_value: str):
         raise HTTPException(status_code=404, detail="String does not exist in the system")
     session.delete(db_obj)
     session.commit()
-    return JSONResponse(status_code=204, content=None)
+    return Response(status_code=204)
 
 
 

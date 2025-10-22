@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Column, JSON
-import uuid
+
 
 
 class DataEntry(SQLModel, table=True):
@@ -8,8 +8,8 @@ class DataEntry(SQLModel, table=True):
     length: int
     is_palindrome: bool = Field(default=False)
     unique_characters: int
-    sha256_hash: str
-    words_count: int
+    sha256_hash: str = Field(index=True, unique=True)
+    word_count: int
     character_frequency_map: dict[str, int] = Field(sa_column=Column(JSON))
     created_at: str
 
@@ -22,7 +22,7 @@ class Properties(SQLModel):
     length: int
     is_palindrome: bool 
     unique_characters: int
-    words_count: int
+    word_count: int
     sha256_hash: str
     character_frequency_map: dict[str, int] = Field(sa_column=Column(JSON))
     
