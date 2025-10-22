@@ -7,6 +7,7 @@ from app.db import create_db_and_tables
 from app.models import StringResponse, DataEntry, Properties
 from app.utils import now_isoutc, generate_sha256, parse_nl_query
 from pydantic import BaseModel
+from json import JSONDecodeError
 
 
 
@@ -18,14 +19,20 @@ app = FastAPI()
 
 
 @app.post("/strings", status_code=status.HTTP_201_CREATED, response_model=StringResponse)
-def analyze_string(string: StringIn, session: SessionDep):
-    if not isinstance(string.value, str):
+async def analyze_string(string: StringIn, session: SessionDep):
+
+    try:
+        body = await string.model_dump()
+    except JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid json body")
+    if 'value' not in body:
+        raise HTTPException(status_code=400, detail='Invalid request body or missing "value" field')
+    value = body['value']
+
+    if not isinstance(value, str):
         raise HTTPException(status_code=422, detail=" Invalid data type for 'value' (must be string)")
-    if string.value == "":
-        raise HTTPException(status_code=400, detail=" Invalid request body or missing 'value' field")
-    
-    original_value = string.value
-    props = string_analyzer(original_value)
+
+    props = string_analyzer(value)
     hashed_value = props.sha256_hash
     existing = session.exec(select(DataEntry).where(DataEntry.sha256_hash == hashed_value)).first()
     if existing:
@@ -33,7 +40,7 @@ def analyze_string(string: StringIn, session: SessionDep):
     
     data_entry = DataEntry(
         id = props.sha256_hash, 
-        value = original_value,
+        value = value,
         length = props.length,
         is_palindrome = props.is_palindrome,
         unique_characters = props.unique_characters,

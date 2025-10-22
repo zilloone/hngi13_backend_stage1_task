@@ -6,7 +6,7 @@ from app.models import StringResponse, Properties
 
 def generate_sha256(text: str) -> str:
     # Hash any text using sha256 algorithm
-    return hashlib.sha256(text.encode()).hexdigest()
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 
