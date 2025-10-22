@@ -19,12 +19,10 @@ app = FastAPI()
 
 
 @app.post("/strings", status_code=status.HTTP_201_CREATED, response_model=StringResponse)
-async def analyze_string(string: StringIn, session: SessionDep):
+def analyze_string(string: StringIn, session: SessionDep):
 
-    try:
-        body = await string.model_dump()
-    except JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid json body")
+    
+    body = string.model_dump()
     if 'value' not in body:
         raise HTTPException(status_code=400, detail='Invalid request body or missing "value" field')
     value = body['value']
@@ -62,10 +60,7 @@ async def analyze_string(string: StringIn, session: SessionDep):
     )
     
     
-    return JSONResponse(
-        content=response_data,
-        status_code=201
-    )
+    return response_data
 
 
 
@@ -130,10 +125,7 @@ def read_string(string_value: str, session: SessionDep):
         created_at=data.created_at 
     )  
 
-    return JSONResponse(
-        status_code=200,
-        content=response_data
-    )
+    return response_data
 
 
 
@@ -147,7 +139,7 @@ def get_all_strings(
     contains_character: str | None = Query(None, min_length=1, max_length=1),
 ):
     try:
-        if min_length is not None and max_length is not None and min_length > max_length:
+        if (min_length is not None and max_length is not None) and min_length > max_length:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid query parameter values or types",
@@ -188,9 +180,7 @@ def get_all_strings(
             )
             data.append(response_data)
 
-        return JSONResponse(
-            status_code=200,
-            content={
+        return {
             "data": data,
             "count": count,
             "filters_applied": {
@@ -201,7 +191,6 @@ def get_all_strings(
                 "contains_character": contains_character,
             },
         }
-        )
 
     except Exception:
         # Keep error message generic but return 400 as before
@@ -215,13 +204,13 @@ def get_all_strings(
 @app.delete("/strings/{string_value}", status_code=204)
 def delete_string(session: SessionDep, string_value: str):
     #hashed_value = generate_sha256(string_value)
-    try:
-        db_obj = session.exec(select(DataEntry).where(DataEntry.value == string_value)).first()
-    except:
+    
+    db_obj = session.exec(select(DataEntry).where(DataEntry.value == string_value)).first()
+    if db_obj is None:
         raise HTTPException(status_code=404, detail="String does not exist in the system")
     session.delete(db_obj)
     session.commit()
-    return Response(status_code=204)
+    return None
 
 
 
