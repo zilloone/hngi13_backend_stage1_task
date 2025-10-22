@@ -215,9 +215,9 @@ def get_all_strings(
 @app.delete("/strings/{string_value}", status_code=204)
 def delete_string(session: SessionDep, string_value: str):
     #hashed_value = generate_sha256(string_value)
-
-    db_obj = session.exec(select(DataEntry).where(DataEntry.value == string_value)).first()
-    if not db_obj:
+    try:
+        db_obj = session.exec(select(DataEntry).where(DataEntry.value == string_value)).first()
+    except:
         raise HTTPException(status_code=404, detail="String does not exist in the system")
     session.delete(db_obj)
     session.commit()
