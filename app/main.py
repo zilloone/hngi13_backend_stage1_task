@@ -6,11 +6,12 @@ from app.deps import SessionDep
 from app.db import create_db_and_tables
 from app.models import StringResponse, DataEntry, Properties
 from app.utils import now_isoutc, generate_sha256, parse_nl_query
+from pydantic import BaseModel
 
 
 
 
-class StringIn(SQLModel):
+class StringIn(BaseModel):
     value: str = Field(..., min_length=1, description="String to analyze (non-empty)")
 
 app = FastAPI()
@@ -123,6 +124,33 @@ def filter_nl(
             "parsed_filters": parsed,
         },
     }
+
+
+
+@app.get("/strings/{string_value}", status_code=status.HTTP_200_OK, response_model=StringResponse)
+def read_string(string_value: str, session: SessionDep): 
+    sha256_hash = generate_sha256(string_value)
+    data = session.exec(select(DataEntry).where(DataEntry.sha256_hash == sha256_hash)).first() 
+    if data is None: 
+        raise HTTPException(status_code=404, detail="String does not exist in the system") 
+    props = Properties(
+        length = data.length, 
+        is_palindrome = data.is_palindrome, 
+        unique_characters = data.unique_characters, 
+        sha256_hash = data.sha256_hash, 
+        word_count = data.word_count, 
+        character_frequency_map = data.character_frequency_map
+    )
+
+    response_data = StringResponse(
+        id=data.id, 
+        value=data.value, 
+        properties=props, 
+        created_at=data.created_at 
+    )  
+
+    return response_data
+
 
 
 @app.get("/strings")
