@@ -24,7 +24,10 @@ def analyze_string(string: StringIn, session: SessionDep):
     value = string.value
 
     # Compute properties
-    props = string_analyzer(value)
+    try:
+        props = string_analyzer(value)
+    except (TypeError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=f"Invalid data type for {str(e)}")
     hashed_value = props.sha256_hash
 
     # Duplicate check
@@ -54,22 +57,23 @@ def analyze_string(string: StringIn, session: SessionDep):
     session.commit()
     session.refresh(data_entry)
 
+    props_from_db = Properties(
+        length=data_entry.length,
+        is_palindrome=data_entry.is_palindrome,
+        unique_characters=data_entry.unique_characters,
+        word_count=data_entry.word_count,
+        character_frequency_map=data_entry.character_frequency_map
+    )
+
     created_at_str = data_entry.created_at.replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content= {
-            "id":data_entry.id,
-            "value":data_entry.value,
-            "properties":props.model_dump(),
-            "created_at":created_at_str
-        }
+    return StringResponse(
+        id=data_entry.id,
+        value=data_entry.value,
+        properties=props_from_db,
+        created_at=created_at_str
     )
     
         
-    
-
-
-
 
 @app.get("/strings/filter-by-natural-language")
 def filter_by_natural_language(session: SessionDep, query: str = Query(...)):
@@ -125,14 +129,12 @@ def read_string(string_value: str, session: SessionDep):
         character_frequency_map = data.character_frequency_map
     )
 
-    response_data = StringResponse(
+    return StringResponse(
         id=data.id, 
         value=data.value, 
         properties=props, 
         created_at=data.created_at.replace(microsecond=0).isoformat().replace("+00:00", "Z") 
     )  
-
-    return response_data
 
 
 
@@ -218,7 +220,7 @@ def delete_string(session: SessionDep, string_value: str):
     session.delete(db_obj)
     session.commit()
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return None
     
 
 
