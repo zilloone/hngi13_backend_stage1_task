@@ -7,7 +7,7 @@ from app.db import create_db_and_tables
 from app.models import StringResponse, DataEntry, Properties
 from app.utils import now_isoutc, generate_sha256, parse_nl_query
 from pydantic import BaseModel
-from json import JSONDecodeError
+
 
 
 
@@ -18,7 +18,7 @@ class StringIn(BaseModel):
 app = FastAPI()
 
 
-@app.post("/strings", status_code=status.HTTP_201_CREATED, response_model=StringResponse)
+@app.post("/strings", status_code=201)
 def analyze_string(string: StringIn, session: SessionDep):
    
     value = string.value
@@ -33,7 +33,7 @@ def analyze_string(string: StringIn, session: SessionDep):
     ).first()
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=409,
             detail="String already exists in the system"
         )
 
@@ -54,14 +54,15 @@ def analyze_string(string: StringIn, session: SessionDep):
     session.commit()
     session.refresh(data_entry)
 
-    # Build the response exactly matching response_model
-    # If Properties is a Pydantic model compatible with response_model, you can pass props directly.
-    return StringResponse(
-        id=data_entry.id,
-        value=data_entry.value,
-        properties=props,
-        created_at=data_entry.created_at
-    )
+    
+    return {
+        "id":data_entry.id,
+        "value":data_entry.value,
+        "properties":props,
+        "created_at":data_entry.created_at
+    }
+        
+    
 
 
 
@@ -212,7 +213,7 @@ def delete_string(session: SessionDep, string_value: str):
         raise HTTPException(status_code=404, detail="String does not exist in the system")
     session.delete(db_obj)
     session.commit()
-    return None
+    return {}
 
 
 
