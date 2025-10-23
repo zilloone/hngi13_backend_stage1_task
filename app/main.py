@@ -18,7 +18,7 @@ class StringIn(BaseModel):
 app = FastAPI()
 
 
-@app.post("/strings", status_code=201)
+@app.post("/strings", status_code=201, response_model=StringResponse)
 def analyze_string(string: StringIn, session: SessionDep):
    
     value = string.value
@@ -54,13 +54,16 @@ def analyze_string(string: StringIn, session: SessionDep):
     session.commit()
     session.refresh(data_entry)
 
+    return JSONResponse(
+        content= {
+            "id":data_entry.id,
+            "value":data_entry.value,
+            "properties":props.model_dump(),
+            "created_at":data_entry.created_at
+        },
+        status_code=201
+    )
     
-    return {
-        "id":data_entry.id,
-        "value":data_entry.value,
-        "properties":props,
-        "created_at":data_entry.created_at
-    }
         
     
 
@@ -213,7 +216,7 @@ def delete_string(session: SessionDep, string_value: str):
         raise HTTPException(status_code=404, detail="String does not exist in the system")
     session.delete(db_obj)
     session.commit()
-    return {}
+    
 
 
 

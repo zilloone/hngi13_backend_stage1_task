@@ -46,7 +46,7 @@ def string_analyzer(text: str):
 
 
 def now_isoutc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(timezone.utc)
 
 
 def parse_nl_query(q: str) -> dict[str, Any]:
