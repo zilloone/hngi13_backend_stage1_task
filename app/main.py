@@ -13,12 +13,12 @@ from pydantic import BaseModel
 
 
 class StringIn(BaseModel):
-    value: str = Field(..., min_length=1, description="String to analyze (non-empty)")
+    value: str
 
 app = FastAPI()
 
 
-@app.post("/strings", status_code=201, response_model=StringResponse)
+@app.post("/strings", status_code=status.HTTP_201_CREATED, response_model=StringResponse)
 def analyze_string(string: StringIn, session: SessionDep):
    
     value = string.value
@@ -36,7 +36,7 @@ def analyze_string(string: StringIn, session: SessionDep):
             status_code=409,
             detail="String already exists in the system"
         )
-
+   
     # Create DB record
     data_entry = DataEntry(
         id=hashed_value,
@@ -54,14 +54,15 @@ def analyze_string(string: StringIn, session: SessionDep):
     session.commit()
     session.refresh(data_entry)
 
+    created_at_str = data_entry.created_at.replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
         content= {
             "id":data_entry.id,
             "value":data_entry.value,
             "properties":props.model_dump(),
-            "created_at":data_entry.created_at
-        },
-        status_code=201
+            "created_at":created_at_str
+        }
     )
     
         
@@ -128,7 +129,7 @@ def read_string(string_value: str, session: SessionDep):
         id=data.id, 
         value=data.value, 
         properties=props, 
-        created_at=data.created_at 
+        created_at=data.created_at.replace(microsecond=0).isoformat().replace("+00:00", "Z") 
     )  
 
     return response_data
@@ -216,6 +217,8 @@ def delete_string(session: SessionDep, string_value: str):
         raise HTTPException(status_code=404, detail="String does not exist in the system")
     session.delete(db_obj)
     session.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
     
 
 
